@@ -14,7 +14,7 @@ from networksecurity.logging.logger import logging
 from networksecurity.pipeline.training_pipeline import TrainingPipeline
 
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, File, UploadFile,Request
+from fastapi import FastAPI, File, UploadFile, Request, Form
 from uvicorn import run as app_run
 from fastapi.responses import Response
 from starlette.responses import RedirectResponse
@@ -23,6 +23,7 @@ import pandas as pd
 from networksecurity.utlis.main_utlis.utlis import load_object
 
 from networksecurity.utlis.ml_utlis.model.estimator import NetworkModel
+from networksecurity.utlis.url_feature_extraction import extract_features
 
 
 client = pymongo.MongoClient(mongo_db_url, tlsCAFile=ca)
@@ -48,9 +49,8 @@ from fastapi.templating import Jinja2Templates
 templates = Jinja2Templates(directory="./templates")
 
 @app.get("/", tags=["authentication"])
-async def index():
-    return RedirectResponse(url="/docs")
-
+async def index(request: Request):
+    return templates.TemplateResponse(request=request, name="index.html")
 @app.get("/train")
 async def train_route():
     try:
@@ -79,9 +79,26 @@ async def predict_route(request: Request,file: UploadFile = File(...)):
         table_html = df.to_html(classes='table table-striped')
         #print(table_html)
         return templates.TemplateResponse(request=request, name="table.html", context={"table": table_html})
-        
     except Exception as e:
-            raise NetworkSecurityException(e,sys)
+        raise NetworkSecurityException(e,sys)
+
+@app.post("/predict_url")
+async def predict_url_route(request: Request, url: str = Form(...)):
+    try:
+        features = extract_features(url)
+        input_df = pd.DataFrame([features])
+
+        preprocesor = load_object("final_model/preprocessor.pkl")
+        final_model = load_object("final_model/model.pkl")
+        network_model = NetworkModel(preprocessor=preprocesor, model=final_model)
+
+        y_pred = network_model.predict(input_df)
+        result = "SAFE" if y_pred[0] == 1 else "MALICIOUS"
+
+        return {"url": url, "prediction": result}
+
+    except Exception as e:
+        raise NetworkSecurityException(e, sys)
 
     
 if __name__=="__main__":
