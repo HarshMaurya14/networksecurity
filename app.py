@@ -48,42 +48,62 @@ app.add_middleware(
 from fastapi.templating import Jinja2Templates
 templates = Jinja2Templates(directory="./templates")
 
+
 @app.get("/", tags=["authentication"])
 async def index(request: Request):
     return templates.TemplateResponse(request=request, name="index.html")
+
+
 @app.get("/train")
 async def train_route():
     try:
-        train_pipeline=TrainingPipeline()
+        train_pipeline = TrainingPipeline()
         train_pipeline.run_pipeline()
         return Response("Training is successful")
     except Exception as e:
-        raise NetworkSecurityException(e,sys)
-    
+        raise NetworkSecurityException(e, sys)
+
+
 @app.post("/predict")
-async def predict_route(request: Request,file: UploadFile = File(...)):
+async def predict_route(request: Request, file: UploadFile = File(...)):
+    """
+    Bulk prediction from a CSV that already has all 30 pre-built
+    features (same format as the training data). No feature
+    extraction happens here — it assumes the numbers are already
+    computed and just runs them through the model.
+    """
     try:
-        df=pd.read_csv(file.file)
-        #print(df)
-        preprocesor=load_object("final_model/preprocessor.pkl")
-        final_model=load_object("final_model/model.pkl")
-        network_model = NetworkModel(preprocessor=preprocesor,model=final_model)
-        print(df.iloc[0])
+        try:
+            df = pd.read_csv(file.file, encoding="utf-8")
+        except UnicodeDecodeError:
+            file.file.seek(0)
+            df = pd.read_csv(file.file, encoding="latin-1")
+
+        preprocesor = load_object("final_model/preprocessor.pkl")
+        final_model = load_object("final_model/model.pkl")
+        network_model = NetworkModel(preprocessor=preprocesor, model=final_model)
+
         y_pred = network_model.predict(df)
-        print(y_pred)
         df['predicted_column'] = y_pred
-        print(df['predicted_column'])
-        #df['predicted_column'].replace(-1, 0)
-        #return df.to_json()
+
         df.to_csv('prediction_output/output.csv')
-        table_html = df.to_html(classes='table table-striped')
-        #print(table_html)
-        return templates.TemplateResponse(request=request, name="table.html", context={"table": table_html})
+        table_html = df.to_html(classes='table table-striped', index=False)
+
+        return templates.TemplateResponse(
+            request=request, name="table.html", context={"table": table_html}
+        )
     except Exception as e:
-        raise NetworkSecurityException(e,sys)
+        raise NetworkSecurityException(e, sys)
+
 
 @app.post("/predict_url")
 async def predict_url_route(request: Request, url: str = Form(...)):
+    """
+    Single raw URL classification. Computes all 30 features live
+    (24 genuinely extracted, 6 honest neutral defaults for features
+    that need now-defunct/paid services) and returns the verdict
+    plus the full feature breakdown.
+    """
     try:
         features = extract_features(url)
         input_df = pd.DataFrame([features])
@@ -98,16 +118,60 @@ async def predict_url_route(request: Request, url: str = Form(...)):
         return {
             "url": url,
             "prediction": result,
-            "features": features,   # ADDED: real computed signal values
+            "features": features,
         }
 
     except Exception as e:
         raise NetworkSecurityException(e, sys)
 
+
+@app.post("/predict_url_csv")
+async def predict_url_csv_route(request: Request, file: UploadFile = File(...)):
+    """
+    Bulk prediction from a CSV of RAW URLs (one column, e.g. "url").
+    Runs the same live feature extraction used by /predict_url on
+    every row, then classifies each one. Slower than /predict since
+    every row triggers a real HTTP fetch of the target page — that's
+    an honest tradeoff, not a bug.
+    """
+    try:
+        try:
+            df = pd.read_csv(file.file, encoding="utf-8")
+        except UnicodeDecodeError:
+            file.file.seek(0)
+            df = pd.read_csv(file.file, encoding="latin-1")
+
+        url_col = "url" if "url" in df.columns else df.columns[0]
+
+        preprocesor = load_object("final_model/preprocessor.pkl")
+        final_model = load_object("final_model/model.pkl")
+        network_model = NetworkModel(preprocessor=preprocesor, model=final_model)
+
+        rows = []
+        for raw_url in df[url_col].astype(str):
+            try:
+                features = extract_features(raw_url)
+                input_df = pd.DataFrame([features])
+                y_pred = network_model.predict(input_df)
+                result = "SAFE" if y_pred[0] == 1 else "MALICIOUS"
+            except Exception:
+                features = {}
+                result = "ERROR"
+
+            row = {"url": raw_url, **features, "predicted_column": result}
+            rows.append(row)
+
+        result_df = pd.DataFrame(rows)
+        result_df.to_csv("prediction_output/url_batch_output.csv", index=False)
+
+        table_html = result_df.to_html(classes="table table-striped", index=False)
+        return templates.TemplateResponse(
+            request=request, name="table.html", context={"table": table_html}
+        )
+
     except Exception as e:
         raise NetworkSecurityException(e, sys)
 
-    
-if __name__=="__main__":
-    app_run(app,host="0.0.0.0",port=8000)
 
+if __name__ == "__main__":
+    app_run(app, host="0.0.0.0", port=8000)

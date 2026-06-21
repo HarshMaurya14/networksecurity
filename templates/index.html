@@ -265,7 +265,8 @@
     <div class="glass-card">
       <div class="mode-tabs">
         <button class="active" id="tabUrl" onclick="switchMode('url')">Single URL</button>
-        <button id="tabCsv" onclick="switchMode('csv')">Bulk CSV</button>
+        <button id="tabCsv" onclick="switchMode('csv')">Bulk CSV (features)</button>
+        <button id="tabUrlCsv" onclick="switchMode('urlcsv')">Bulk URLs (raw)</button>
       </div>
 
       <!-- URL MODE -->
@@ -293,8 +294,9 @@
         </div>
       </div>
 
-      <!-- CSV MODE -->
+      <!-- CSV MODE (pre-built features) -->
       <div id="csvPanel" style="display:none;">
+        <p style="font-size:12.5px; color:var(--dim); margin-bottom:16px; line-height:1.6;">For CSVs that already have all 30 model features pre-computed — same format as the training data.</p>
         <form id="csvForm">
           <div class="dropzone" id="dropzone">
             <input type="file" id="csvFile" accept=".csv" required>
@@ -315,6 +317,30 @@
           </div>
         </div>
       </div>
+
+      <!-- BULK RAW URL MODE -->
+      <div id="urlCsvPanel" style="display:none;">
+        <p style="font-size:12.5px; color:var(--dim); margin-bottom:16px; line-height:1.6;">For a plain list of raw URLs — one per row, column named "url". NETGUARD extracts all 30 features live for each link, so larger files take longer (one real page fetch per URL).</p>
+        <form id="urlCsvForm">
+          <div class="dropzone" id="dropzoneUrlCsv">
+            <input type="file" id="urlCsvFile" accept=".csv" required>
+            <p>Drop a CSV of raw URLs here, or click to browse</p>
+            <div class="fname" id="urlCsvFname"></div>
+          </div>
+          <button type="submit" class="scan-btn" id="urlCsvBtn" style="width:100%; margin-top:14px; padding:14px;">Extract &amp; classify all</button>
+        </form>
+
+        <div class="results-panel" id="urlCsvResultsPanel">
+          <div class="results-summary">
+            <div class="cell"><div class="num" id="urTotal">—</div><div class="lbl">scanned</div></div>
+            <div class="cell"><div class="num" id="urThreat" style="color:var(--threat)">—</div><div class="lbl">malicious</div></div>
+            <div class="cell"><div class="num" id="urSafe" style="color:var(--safe)">—</div><div class="lbl">safe</div></div>
+          </div>
+          <div style="overflow-x:auto; border:1px solid var(--glass-border); border-radius:13px;">
+            <table class="result-table" id="urlCsvResultTable"></table>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="stats-row">
@@ -332,8 +358,10 @@
 function switchMode(mode){
   document.getElementById('tabUrl').classList.toggle('active', mode==='url');
   document.getElementById('tabCsv').classList.toggle('active', mode==='csv');
+  document.getElementById('tabUrlCsv').classList.toggle('active', mode==='urlcsv');
   document.getElementById('urlPanel').style.display = mode==='url' ? 'block' : 'none';
   document.getElementById('csvPanel').style.display = mode==='csv' ? 'block' : 'none';
+  document.getElementById('urlCsvPanel').style.display = mode==='urlcsv' ? 'block' : 'none';
 }
 
 let lastFeatures = null;
@@ -469,6 +497,55 @@ document.getElementById('csvForm').addEventListener('submit', async e=>{
   }catch(err){ alert('Upload failed: ' + err.message); }
 
   btn.disabled = false; btn.textContent = 'Run bulk classification';
+});
+
+// Bulk raw URL CSV mode
+const dzUrlCsv = document.getElementById('dropzoneUrlCsv');
+const urlCsvFile = document.getElementById('urlCsvFile');
+const urlCsvFname = document.getElementById('urlCsvFname');
+urlCsvFile.addEventListener('change', ()=>{ if(urlCsvFile.files.length) urlCsvFname.textContent = '✓ ' + urlCsvFile.files[0].name; });
+['dragenter','dragover'].forEach(evt=> dzUrlCsv.addEventListener(evt, e=>{e.preventDefault(); dzUrlCsv.classList.add('drag');}));
+['dragleave','drop'].forEach(evt=> dzUrlCsv.addEventListener(evt, e=>{e.preventDefault(); dzUrlCsv.classList.remove('drag');}));
+dzUrlCsv.addEventListener('drop', e=>{ const f=e.dataTransfer.files; if(f.length){ urlCsvFile.files=f; urlCsvFname.textContent='✓ '+f[0].name; }});
+
+document.getElementById('urlCsvForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  if(!urlCsvFile.files.length) return;
+  const btn = document.getElementById('urlCsvBtn');
+  btn.disabled = true; btn.textContent = 'Extracting features & classifying…';
+
+  const formData = new FormData();
+  formData.append('file', urlCsvFile.files[0]);
+
+  try{
+    const res = await fetch('/predict_url_csv', {method:'POST', body: formData});
+    const html = await res.text();
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const table = doc.querySelector('table');
+    if(table){
+      const headers = Array.from(table.querySelectorAll('thead th')).map(th=>th.textContent.trim());
+      let predIdx = headers.findIndex(h=>h.toLowerCase().includes('predicted'));
+      const rows = Array.from(table.querySelectorAll('tbody tr'));
+      let threats=0, safe=0;
+      rows.forEach(tr=>{
+        const cells = tr.querySelectorAll('td');
+        if(predIdx===-1||!cells[predIdx]) return;
+        const val = cells[predIdx].textContent.trim();
+        const isThreat = val==='MALICIOUS';
+        const isError = val==='ERROR';
+        if(isThreat){ threats++; cells[predIdx].innerHTML='<span class="pill threat">malicious</span>'; }
+        else if(isError){ cells[predIdx].innerHTML='<span class="pill" style="background:rgba(255,255,255,0.08); color:var(--dim);">error</span>'; }
+        else{ safe++; cells[predIdx].innerHTML='<span class="pill safe">safe</span>'; }
+      });
+      document.getElementById('urTotal').textContent = rows.length;
+      document.getElementById('urThreat').textContent = threats;
+      document.getElementById('urSafe').textContent = safe;
+      document.getElementById('urlCsvResultTable').innerHTML = table.innerHTML;
+      document.getElementById('urlCsvResultsPanel').classList.add('show');
+    }
+  }catch(err){ alert('Upload failed: ' + err.message); }
+
+  btn.disabled = false; btn.textContent = 'Extract & classify all';
 });
 </script>
 </body>
