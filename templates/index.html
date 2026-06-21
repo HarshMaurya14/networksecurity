@@ -3,371 +3,330 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NETGUARD · Phishing & Threat Detection</title>
+<title>NETGUARD — See through every link</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0B0F14;
-    --surface:#11161D;
-    --raised:#171D26;
-    --border:#232B36;
-    --border-light:#2C3543;
-    --text:#E8ECF1;
-    --dim:#7C8896;
-    --dimmer:#4D5765;
-    --safe:#34D399;
-    --safe-bg:#0F2A22;
-    --threat:#FB6A6A;
-    --threat-bg:#2E1518;
-    --accent:#6E9FFF;
-    --accent-bg:#13203A;
+    --ink:#0D1117;
+    --ink-deep:#080B0F;
+    --glass:rgba(255,255,255,0.045);
+    --glass-strong:rgba(255,255,255,0.075);
+    --glass-border:rgba(255,255,255,0.09);
+    --glass-border-light:rgba(255,255,255,0.16);
+    --text:#F0F3F6;
+    --dim:#8B95A1;
+    --dimmer:#566070;
+    --safe:#5EEAD4;
+    --safe-bg:rgba(94,234,212,0.09);
+    --threat:#FB7185;
+    --threat-bg:rgba(251,113,133,0.1);
+    --glow:#8DA8FF;
   }
   *{box-sizing:border-box; margin:0; padding:0;}
   html{scroll-behavior:smooth;}
   body{
-    background:var(--bg); color:var(--text);
+    background:var(--ink); color:var(--text);
     font-family:'Inter',sans-serif;
-    min-height:100vh;
+    min-height:100vh; overflow-x:hidden;
+    position:relative;
   }
-  ::selection{background:var(--accent); color:#04111F;}
+  ::selection{background:var(--glow); color:#06080B;}
 
-  /* ===== Header ===== */
+  /* ambient background blobs */
+  .blob{
+    position:fixed; border-radius:50%; filter:blur(90px);
+    pointer-events:none; z-index:0; opacity:0.35;
+  }
+  .blob-1{width:480px; height:480px; background:#3D5AFE; top:-180px; left:-120px; animation:drift1 22s ease-in-out infinite;}
+  .blob-2{width:420px; height:420px; background:#14B8A6; bottom:-160px; right:-100px; animation:drift2 26s ease-in-out infinite;}
+  .blob-3{width:300px; height:300px; background:#7C3AED; top:40%; left:60%; animation:drift1 18s ease-in-out infinite reverse; opacity:0.2;}
+  @keyframes drift1{0%,100%{transform:translate(0,0);} 50%{transform:translate(40px,30px);}}
+  @keyframes drift2{0%,100%{transform:translate(0,0);} 50%{transform:translate(-30px,-40px);}}
+
   header{
-    border-bottom:1px solid var(--border);
-    padding:18px 40px;
+    position:relative; z-index:10;
+    padding:22px 44px;
     display:flex; align-items:center; justify-content:space-between;
-    position:sticky; top:0; z-index:50;
-    background:rgba(11,15,20,0.92);
-    backdrop-filter:blur(10px);
+    background:rgba(13,17,23,0.55); backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--glass-border);
   }
   .logo{
-    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:19px;
-    display:flex; align-items:center; gap:10px; letter-spacing:-0.3px;
+    font-family:'Fraunces',serif; font-weight:600; font-size:20px;
+    letter-spacing:-0.3px; display:flex; align-items:center; gap:10px;
   }
-  .logo .mark{
-    width:20px; height:20px; border-radius:5px;
-    background:linear-gradient(135deg, var(--accent), var(--safe));
-    position:relative; flex-shrink:0;
+  .logo .orb{
+    width:9px; height:9px; border-radius:50%;
+    background:radial-gradient(circle, var(--safe), var(--glow));
+    box-shadow:0 0 12px var(--safe);
   }
-  .logo .mark::after{
-    content:''; position:absolute; inset:4px;
-    background:var(--bg); border-radius:2px;
-  }
-  .live-pill{
-    display:flex; align-items:center; gap:7px;
-    font-family:'IBM Plex Mono',monospace; font-size:11px;
-    color:var(--safe); background:var(--safe-bg);
-    padding:5px 11px; border-radius:20px;
-    border:1px solid rgba(52,211,153,0.25);
-  }
-  .live-pill .dot{
-    width:6px; height:6px; border-radius:50%; background:var(--safe);
-    animation:blink 1.6s ease-in-out infinite;
-  }
-  @keyframes blink{0%,100%{opacity:1;} 50%{opacity:0.3;}}
-  nav a{
-    color:var(--dim); text-decoration:none; font-size:13px;
-    margin-left:24px;
-  }
+  nav a{color:var(--dim); text-decoration:none; font-size:13.5px; margin-left:28px; transition:color 0.15s;}
   nav a:hover{color:var(--text);}
 
-  /* ===== Hero / Layout ===== */
-  main{max-width:1240px; margin:0 auto; padding:56px 32px 100px;}
+  main{position:relative; z-index:5; max-width:1040px; margin:0 auto; padding:80px 28px 110px;}
 
-  .hero-grid{
-    display:grid; grid-template-columns:1fr 320px; gap:48px;
-    margin-bottom:56px;
-  }
-
+  .hero-text{text-align:center; margin-bottom:48px;}
   .eyebrow{
-    font-family:'IBM Plex Mono',monospace; font-size:12px;
-    color:var(--accent); letter-spacing:1.5px; text-transform:uppercase;
-    margin-bottom:18px; display:flex; align-items:center; gap:8px;
+    font-size:12.5px; color:var(--glow); letter-spacing:2px; text-transform:uppercase;
+    margin-bottom:20px; display:inline-flex; align-items:center; gap:9px;
+    padding:7px 16px; border:1px solid var(--glass-border); border-radius:30px;
+    background:var(--glass); backdrop-filter:blur(8px);
   }
-  .eyebrow .ln{width:18px; height:1px; background:var(--accent);}
-
   h1{
-    font-family:'Space Grotesk',sans-serif;
-    font-size:clamp(34px,4.4vw,50px); font-weight:700;
-    line-height:1.06; letter-spacing:-1.2px; margin-bottom:18px;
+    font-family:'Fraunces',serif; font-weight:600;
+    font-size:clamp(36px,5.4vw,58px); line-height:1.08; letter-spacing:-1.5px;
+    margin-bottom:18px;
   }
-  h1 .threat-word{color:var(--threat);}
+  h1 em{font-style:italic; color:var(--safe); font-weight:500;}
+  .lead{color:var(--dim); font-size:16px; line-height:1.6; max-width:480px; margin:0 auto;}
 
-  .lead{color:var(--dim); font-size:16px; line-height:1.65; max-width:480px; margin-bottom:36px;}
+  /* GLASS CARD STACK — signature element */
+  .scan-stack{position:relative; max-width:680px; margin:0 auto;}
 
-  /* ===== Mode toggle ===== */
-  .mode-toggle{
-    display:inline-flex; background:var(--surface);
-    border:1px solid var(--border); border-radius:10px;
-    padding:4px; margin-bottom:24px;
+  .glass-card{
+    background:var(--glass);
+    border:1px solid var(--glass-border);
+    border-radius:20px;
+    backdrop-filter:blur(20px);
+    -webkit-backdrop-filter:blur(20px);
+    box-shadow:0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
+    padding:32px;
+    position:relative;
   }
-  .mode-toggle button{
+
+  .mode-tabs{display:flex; gap:6px; margin-bottom:22px;}
+  .mode-tabs button{
     font-family:'Inter',sans-serif; font-weight:500; font-size:13px;
-    background:transparent; border:none; color:var(--dim);
-    padding:9px 18px; border-radius:7px; cursor:pointer;
-    transition:background 0.15s, color 0.15s;
+    background:transparent; border:1px solid transparent; color:var(--dim);
+    padding:8px 16px; border-radius:10px; cursor:pointer; transition:all 0.18s;
   }
-  .mode-toggle button.active{
-    background:var(--raised); color:var(--text);
-    box-shadow:0 0 0 1px var(--border-light);
+  .mode-tabs button.active{
+    background:var(--glass-strong); border-color:var(--glass-border-light); color:var(--text);
   }
 
-  /* ===== Scan panel ===== */
-  .panel{
-    background:var(--surface); border:1px solid var(--border);
-    border-radius:14px; overflow:hidden;
+  .input-row{display:flex; gap:10px;}
+  .input-row input{
+    flex:1; background:rgba(0,0,0,0.25); border:1px solid var(--glass-border);
+    border-radius:13px; padding:15px 18px; color:var(--text);
+    font-family:'Inter',sans-serif; font-size:14.5px; outline:none;
+    transition:border-color 0.18s, background 0.18s;
   }
-  .panel-body{padding:28px;}
-
-  .url-input-row{display:flex; gap:10px;}
-  .url-input-row input{
-    flex:1; background:var(--raised); border:1px solid var(--border);
-    border-radius:9px; padding:14px 16px;
-    font-family:'IBM Plex Mono',monospace; font-size:14px; color:var(--text);
-    outline:none; transition:border-color 0.15s;
-  }
-  .url-input-row input:focus{border-color:var(--accent);}
-  .url-input-row input::placeholder{color:var(--dimmer);}
+  .input-row input:focus{border-color:var(--glow); background:rgba(0,0,0,0.35);}
+  .input-row input::placeholder{color:var(--dimmer);}
 
   button.scan-btn{
     font-family:'Inter',sans-serif; font-weight:600; font-size:14px;
-    background:var(--accent); color:#04111F; border:none;
-    border-radius:9px; padding:0 26px; cursor:pointer;
-    display:flex; align-items:center; gap:8px;
-    transition:opacity 0.15s, transform 0.1s;
+    background:linear-gradient(135deg, var(--glow), #5EEAD4);
+    color:#06080B; border:none; border-radius:13px; padding:0 26px;
+    cursor:pointer; transition:transform 0.12s, box-shadow 0.18s;
+    box-shadow:0 4px 16px rgba(141,168,255,0.3);
   }
-  button.scan-btn:hover{opacity:0.9;}
-  button.scan-btn:active{transform:scale(0.97);}
-  button.scan-btn:disabled{opacity:0.5; cursor:not-allowed;}
+  button.scan-btn:hover{box-shadow:0 6px 22px rgba(141,168,255,0.45); transform:translateY(-1px);}
+  button.scan-btn:active{transform:translateY(0) scale(0.98);}
+  button.scan-btn:disabled{opacity:0.45; cursor:not-allowed; box-shadow:none; transform:none;}
 
-  /* CSV dropzone */
-  .dropzone{
-    border:1.5px dashed var(--border-light); border-radius:10px;
-    padding:36px 20px; text-align:center; cursor:pointer;
-    transition:border-color 0.15s, background 0.15s; position:relative;
-  }
-  .dropzone:hover, .dropzone.drag{border-color:var(--accent); background:var(--accent-bg);}
-  .dropzone input{position:absolute; inset:0; opacity:0; cursor:pointer;}
-  .dropzone .icon{font-size:24px; color:var(--dim); margin-bottom:10px;}
-  .dropzone p{color:var(--dim); font-size:14px;}
-  .dropzone .fname{font-family:'IBM Plex Mono',monospace; color:var(--accent); font-size:12px; margin-top:8px;}
+  /* layered scan reveal */
+  .reveal-zone{margin-top:24px; display:none;}
+  .reveal-zone.show{display:block;}
 
-  /* ===== Trace readout (signature element) ===== */
-  .trace-wrap{margin-top:24px; display:none;}
-  .trace-wrap.show{display:block;}
-  .trace-list{
-    font-family:'IBM Plex Mono',monospace; font-size:12.5px;
-    background:var(--raised); border:1px solid var(--border);
-    border-radius:10px; padding:16px 18px;
-    max-height:260px; overflow-y:auto;
+  .layer-row{
+    display:flex; align-items:center; gap:14px;
+    padding:14px 18px; margin-bottom:8px;
+    background:rgba(255,255,255,0.025); border:1px solid var(--glass-border);
+    border-radius:13px; opacity:0; transform:translateY(6px);
+    animation:layerIn 0.4s ease forwards;
   }
-  .trace-row{
-    display:flex; align-items:center; gap:10px;
-    padding:5px 0; opacity:0; animation:traceIn 0.25s ease forwards;
-    color:var(--dim);
-  }
-  @keyframes traceIn{ from{opacity:0; transform:translateX(-4px);} to{opacity:1; transform:translateX(0);} }
-  .trace-row .sig{color:var(--text); min-width:200px;}
-  .trace-row .val{margin-left:auto;}
-  .trace-row .val.pos{color:var(--safe);}
-  .trace-row .val.neg{color:var(--threat);}
-  .trace-row .val.neu{color:var(--dim);}
-
-  /* Verdict stamp */
-  .verdict{
-    margin-top:18px; display:none;
-    border-radius:12px; padding:22px 24px;
-    align-items:center; gap:16px;
-  }
-  .verdict.show{display:flex; animation:stampIn 0.3s cubic-bezier(.2,.9,.3,1.3);}
-  @keyframes stampIn{ from{opacity:0; transform:scale(0.92);} to{opacity:1; transform:scale(1);} }
-  .verdict.safe{background:var(--safe-bg); border:1px solid rgba(52,211,153,0.3);}
-  .verdict.threat{background:var(--threat-bg); border:1px solid rgba(251,106,106,0.3);}
-  .verdict-icon{
-    width:44px; height:44px; border-radius:10px;
+  @keyframes layerIn{ to{opacity:1; transform:translateY(0);} }
+  .layer-row .layer-icon{
+    width:30px; height:30px; border-radius:9px; flex-shrink:0;
     display:flex; align-items:center; justify-content:center;
-    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:20px;
-    flex-shrink:0;
+    background:var(--glass-strong); font-size:13px;
   }
-  .verdict.safe .verdict-icon{background:rgba(52,211,153,0.15); color:var(--safe);}
-  .verdict.threat .verdict-icon{background:rgba(251,106,106,0.15); color:var(--threat);}
-  .verdict-text .label{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:17px;}
-  .verdict.safe .label{color:var(--safe);}
-  .verdict.threat .label{color:var(--threat);}
-  .verdict-text .sub{font-size:13px; color:var(--dim); margin-top:2px; font-family:'IBM Plex Mono',monospace;}
+  .layer-row .layer-text{flex:1;}
+  .layer-row .layer-title{font-size:13.5px; font-weight:500;}
+  .layer-row .layer-sub{font-size:11.5px; color:var(--dim); margin-top:1px;}
+  .layer-row .layer-status{font-size:11px; color:var(--dim); font-family:'Inter',sans-serif;}
+  .layer-row.done .layer-icon{background:var(--safe-bg); color:var(--safe);}
+  .layer-row.done .layer-status{color:var(--safe);}
 
-  /* ===== Ledger sidebar ===== */
-  .ledger{
-    background:var(--surface); border:1px solid var(--border);
-    border-radius:14px; padding:22px; height:fit-content;
+  /* verdict card */
+  .verdict-card{
+    margin-top:18px; display:none; border-radius:16px; padding:24px 26px;
+    align-items:center; gap:18px; backdrop-filter:blur(16px);
+    border:1px solid; animation:verdictPop 0.4s cubic-bezier(.22,1,.36,1);
   }
-  .ledger-head{
-    display:flex; align-items:center; justify-content:between; gap:8px;
-    margin-bottom:16px; font-family:'Space Grotesk',sans-serif;
-    font-weight:700; font-size:13px; color:var(--text);
+  .verdict-card.show{display:flex;}
+  @keyframes verdictPop{ from{opacity:0; transform:scale(0.94);} to{opacity:1; transform:scale(1);} }
+  .verdict-card.safe{background:var(--safe-bg); border-color:rgba(94,234,212,0.3);}
+  .verdict-card.threat{background:var(--threat-bg); border-color:rgba(251,113,133,0.3);}
+  .verdict-icon{
+    width:46px; height:46px; border-radius:14px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Fraunces',serif; font-weight:600; font-size:20px;
   }
-  .ledger-head .count{
-    margin-left:auto; font-family:'IBM Plex Mono',monospace;
-    font-size:11px; color:var(--dim); background:var(--raised);
-    padding:2px 8px; border-radius:10px;
-  }
-  .ledger-empty{font-size:13px; color:var(--dimmer); line-height:1.6; padding:8px 0;}
-  .ledger-item{
-    display:flex; align-items:center; gap:10px;
-    padding:10px 0; border-bottom:1px solid var(--border);
-    font-size:12.5px;
-  }
-  .ledger-item:last-child{border-bottom:none;}
-  .ledger-item .url{
-    font-family:'IBM Plex Mono',monospace; color:var(--text);
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;
-  }
-  .ledger-item .dot{width:7px; height:7px; border-radius:50%; flex-shrink:0;}
-  .ledger-item.safe .dot{background:var(--safe);}
-  .ledger-item.threat .dot{background:var(--threat);}
+  .verdict-card.safe .verdict-icon{background:rgba(94,234,212,0.18); color:var(--safe);}
+  .verdict-card.threat .verdict-icon{background:rgba(251,113,133,0.18); color:var(--threat);}
+  .verdict-label{font-family:'Fraunces',serif; font-weight:600; font-size:18px;}
+  .verdict-card.safe .verdict-label{color:var(--safe);}
+  .verdict-card.threat .verdict-label{color:var(--threat);}
+  .verdict-url{font-size:12.5px; color:var(--dim); margin-top:3px; word-break:break-all;}
 
-  /* ===== Stats row ===== */
-  .stats-row{
-    display:grid; grid-template-columns:repeat(4,1fr); gap:14px;
-    margin-top:8px;
+  /* feature detail toggle */
+  .detail-toggle{
+    margin-top:14px; font-size:12.5px; color:var(--dim); cursor:pointer;
+    display:flex; align-items:center; gap:6px; user-select:none;
   }
-  .stat-card{
-    background:var(--surface); border:1px solid var(--border);
-    border-radius:12px; padding:18px;
+  .detail-toggle:hover{color:var(--text);}
+  .feature-detail{
+    display:none; margin-top:10px; border:1px solid var(--glass-border);
+    border-radius:13px; overflow:hidden; max-height:260px; overflow-y:auto;
   }
-  .stat-card .num{font-family:'Space Grotesk',sans-serif; font-size:24px; font-weight:700;}
-  .stat-card .lbl{font-size:12px; color:var(--dim); margin-top:4px;}
+  .feature-detail.show{display:block;}
+  .feature-detail .frow{
+    display:flex; justify-content:space-between; padding:9px 16px;
+    font-size:12px; border-bottom:1px solid var(--glass-border);
+  }
+  .feature-detail .frow:last-child{border-bottom:none;}
+  .feature-detail .fname{color:var(--dim);}
+  .feature-detail .fval.pos{color:var(--safe); font-weight:600;}
+  .feature-detail .fval.neg{color:var(--threat); font-weight:600;}
+  .feature-detail .fval.neu{color:var(--dimmer);}
 
-  /* ===== CSV results table ===== */
-  .results-panel{margin-top:24px; display:none;}
+  /* csv mode */
+  .dropzone{
+    border:1.5px dashed var(--glass-border-light); border-radius:16px;
+    padding:38px 20px; text-align:center; cursor:pointer; position:relative;
+    transition:border-color 0.18s, background 0.18s;
+  }
+  .dropzone:hover, .dropzone.drag{border-color:var(--glow); background:rgba(141,168,255,0.04);}
+  .dropzone input{position:absolute; inset:0; opacity:0; cursor:pointer;}
+  .dropzone p{color:var(--dim); font-size:13.5px;}
+  .dropzone .fname{color:var(--glow); font-size:12px; margin-top:8px;}
+
+  .results-panel{margin-top:20px; display:none;}
   .results-panel.show{display:block;}
-  .results-summary{
-    display:grid; grid-template-columns:repeat(3,1fr); gap:12px;
-    margin-bottom:16px;
+  .results-summary{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px;}
+  .results-summary .cell{
+    background:var(--glass); border:1px solid var(--glass-border); border-radius:13px; padding:16px;
   }
-  table.result-table{width:100%; border-collapse:collapse; font-size:13px;}
+  .results-summary .num{font-family:'Fraunces',serif; font-size:22px; font-weight:600;}
+  .results-summary .lbl{font-size:11px; color:var(--dim); margin-top:3px;}
+
+  table.result-table{width:100%; border-collapse:collapse; font-size:12.5px;}
   table.result-table th{
-    text-align:left; padding:10px 14px; background:var(--raised);
-    color:var(--dim); font-weight:500; font-size:11px;
-    text-transform:uppercase; letter-spacing:0.5px;
-    border-bottom:1px solid var(--border);
+    text-align:left; padding:10px 14px; background:rgba(0,0,0,0.2); color:var(--dim);
+    font-weight:500; text-transform:uppercase; letter-spacing:0.4px; font-size:10.5px;
+    border-bottom:1px solid var(--glass-border);
   }
-  table.result-table td{
-    padding:10px 14px; border-bottom:1px solid var(--border);
-    font-family:'IBM Plex Mono',monospace; color:var(--text);
-  }
+  table.result-table td{padding:10px 14px; border-bottom:1px solid var(--glass-border); color:var(--text);}
   .pill{display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600;}
   .pill.safe{background:var(--safe-bg); color:var(--safe);}
   .pill.threat{background:var(--threat-bg); color:var(--threat);}
-  .pill .d{width:6px; height:6px; border-radius:50%; background:currentColor;}
+
+  .stats-row{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:36px; max-width:680px; margin-left:auto; margin-right:auto;}
+  .stat{
+    background:var(--glass); border:1px solid var(--glass-border); border-radius:14px;
+    padding:18px; text-align:center; backdrop-filter:blur(10px);
+  }
+  .stat .num{font-family:'Fraunces',serif; font-size:21px; font-weight:600;}
+  .stat .lbl{font-size:11px; color:var(--dim); margin-top:3px;}
 
   footer{
-    border-top:1px solid var(--border); padding:24px 40px;
-    text-align:center; color:var(--dimmer); font-size:12px;
-    font-family:'IBM Plex Mono',monospace;
+    position:relative; z-index:5; text-align:center; padding:28px;
+    color:var(--dimmer); font-size:12px; border-top:1px solid var(--glass-border);
   }
 
-  @media (max-width:880px){
-    .hero-grid{grid-template-columns:1fr;}
-    header, main{padding-left:20px; padding-right:20px;}
+  @media (max-width:640px){
+    header, main{padding-left:18px; padding-right:18px;}
     .stats-row{grid-template-columns:1fr 1fr;}
+    .glass-card{padding:22px;}
   }
 </style>
 </head>
 <body>
 
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+<div class="blob blob-3"></div>
+
 <header>
-  <div class="logo"><span class="mark"></span>NETGUARD</div>
-  <div style="display:flex; align-items:center; gap:18px;">
-    <div class="live-pill"><span class="dot"></span>MODEL ONLINE</div>
-    <nav><a href="/docs">API</a></nav>
-  </div>
+  <div class="logo"><span class="orb"></span>netguard</div>
+  <nav><a href="/docs">API</a></nav>
 </header>
 
 <main>
-  <div class="hero-grid">
-    <div>
-      <div class="eyebrow"><span class="ln"></span>Real-time threat classification</div>
-      <h1>Know if a link is<br><span class="threat-word">lying</span> before you click it.</h1>
-      <p class="lead">NETGUARD extracts structural and behavioral signals from a URL — IP-based domains, SSL state, redirect tricks, suspicious anchors — and runs them through a trained classifier in real time.</p>
+  <div class="hero-text">
+    <div class="eyebrow">● model online · real-time analysis</div>
+    <h1>See through<br>every link <em>before</em> you click.</h1>
+    <p class="lead">NETGUARD looks past the surface of a URL — its structure, its page, its behavior — and tells you what's really there.</p>
+  </div>
 
-      <div class="mode-toggle">
+  <div class="scan-stack">
+    <div class="glass-card">
+      <div class="mode-tabs">
         <button class="active" id="tabUrl" onclick="switchMode('url')">Single URL</button>
         <button id="tabCsv" onclick="switchMode('csv')">Bulk CSV</button>
       </div>
 
       <!-- URL MODE -->
-      <div class="panel" id="urlPanel">
-        <div class="panel-body">
-          <div class="url-input-row">
-            <input type="text" id="urlInput" placeholder="paste a url, e.g. http://example.com" />
-            <button class="scan-btn" id="scanBtn" onclick="runScan()">
-              <i></i> Scan
-            </button>
-          </div>
+      <div id="urlPanel">
+        <div class="input-row">
+          <input type="text" id="urlInput" placeholder="paste a url to see through it..." />
+          <button class="scan-btn" id="scanBtn" onclick="runScan()">Reveal</button>
+        </div>
 
-          <div class="trace-wrap" id="traceWrap">
-            <div class="trace-list" id="traceList"></div>
-          </div>
+        <div class="reveal-zone" id="revealZone">
+          <div id="layerList"></div>
 
-          <div class="verdict" id="verdict">
+          <div class="verdict-card" id="verdictCard">
             <div class="verdict-icon" id="verdictIcon">—</div>
-            <div class="verdict-text">
-              <div class="label" id="verdictLabel">—</div>
-              <div class="sub" id="verdictSub">—</div>
+            <div>
+              <div class="verdict-label" id="verdictLabel">—</div>
+              <div class="verdict-url" id="verdictUrl">—</div>
             </div>
           </div>
+
+          <div class="detail-toggle" id="detailToggle" onclick="toggleDetail()" style="display:none;">
+            <span id="detailArrow">▸</span> view all 30 signals
+          </div>
+          <div class="feature-detail" id="featureDetail"></div>
         </div>
       </div>
 
       <!-- CSV MODE -->
-      <div class="panel" id="csvPanel" style="display:none;">
-        <div class="panel-body">
-          <form id="csvForm">
-            <div class="dropzone" id="dropzone">
-              <input type="file" id="csvFile" accept=".csv" required>
-              <div class="icon">⬇</div>
-              <p>Drop a CSV of URLs/features here, or click to browse</p>
-              <div class="fname" id="csvFname"></div>
-            </div>
-            <button type="submit" class="scan-btn" id="csvBtn" style="width:100%; margin-top:14px; justify-content:center; padding:13px;">
-              Run Bulk Classification
-            </button>
-          </form>
+      <div id="csvPanel" style="display:none;">
+        <form id="csvForm">
+          <div class="dropzone" id="dropzone">
+            <input type="file" id="csvFile" accept=".csv" required>
+            <p>Drop a CSV here, or click to browse</p>
+            <div class="fname" id="csvFname"></div>
+          </div>
+          <button type="submit" class="scan-btn" id="csvBtn" style="width:100%; margin-top:14px; padding:14px;">Run bulk classification</button>
+        </form>
 
-          <div class="results-panel" id="resultsPanel">
-            <div class="results-summary">
-              <div class="stat-card"><div class="num" id="rTotal">—</div><div class="lbl">Rows scanned</div></div>
-              <div class="stat-card"><div class="num" id="rThreat" style="color:var(--threat)">—</div><div class="lbl">Malicious</div></div>
-              <div class="stat-card"><div class="num" id="rSafe" style="color:var(--safe)">—</div><div class="lbl">Safe</div></div>
-            </div>
-            <div style="overflow-x:auto; border:1px solid var(--border); border-radius:10px;">
-              <table class="result-table" id="resultTable"></table>
-            </div>
+        <div class="results-panel" id="resultsPanel">
+          <div class="results-summary">
+            <div class="cell"><div class="num" id="rTotal">—</div><div class="lbl">scanned</div></div>
+            <div class="cell"><div class="num" id="rThreat" style="color:var(--threat)">—</div><div class="lbl">malicious</div></div>
+            <div class="cell"><div class="num" id="rSafe" style="color:var(--safe)">—</div><div class="lbl">safe</div></div>
+          </div>
+          <div style="overflow-x:auto; border:1px solid var(--glass-border); border-radius:13px;">
+            <table class="result-table" id="resultTable"></table>
           </div>
         </div>
       </div>
-
-      <div class="stats-row">
-        <div class="stat-card"><div class="num">99.4%</div><div class="lbl">Recall</div></div>
-        <div class="stat-card"><div class="num">98.8%</div><div class="lbl">Precision</div></div>
-        <div class="stat-card"><div class="num">22</div><div class="lbl">Live signals</div></div>
-        <div class="stat-card"><div class="num">&lt;1s</div><div class="lbl">Avg scan time</div></div>
-      </div>
     </div>
 
-    <!-- LEDGER -->
-    <div class="ledger">
-      <div class="ledger-head">Recent scans <span class="count" id="ledgerCount">0</span></div>
-      <div id="ledgerBody">
-        <div class="ledger-empty">No scans yet this session. Results will appear here as you check URLs.</div>
-      </div>
+    <div class="stats-row">
+      <div class="stat"><div class="num">99.4%</div><div class="lbl">recall</div></div>
+      <div class="stat"><div class="num">98.8%</div><div class="lbl">precision</div></div>
+      <div class="stat"><div class="num">24/30</div><div class="lbl">live signals</div></div>
+      <div class="stat"><div class="num">~2s</div><div class="lbl">avg scan</div></div>
     </div>
   </div>
 </main>
 
-<footer>NETGUARD · MLOps Pipeline · Tracked via MLflow + DAGsHub</footer>
+<footer>netguard · mlops pipeline · tracked via mlflow + dagshub</footer>
 
 <script>
 function switchMode(mode){
@@ -377,53 +336,44 @@ function switchMode(mode){
   document.getElementById('csvPanel').style.display = mode==='csv' ? 'block' : 'none';
 }
 
-const SIGNAL_LABELS = [
-  ['having_IP_Address','IP literal as domain'],
-  ['URL_Length','URL length'],
-  ['Shortining_Service','known shortener'],
-  ['having_At_Symbol','"@" symbol present'],
-  ['double_slash_redirecting','redirect via "//"'],
-  ['Prefix_Suffix','hyphen in domain'],
-  ['having_Sub_Domain','subdomain depth'],
-  ['SSLfinal_State','SSL/TLS state'],
-  ['HTTPS_token','"https" token in domain'],
-  ['port','non-standard port'],
-  ['Favicon','favicon presence'],
-  ['Submitting_to_email','mailto: form action'],
-  ['on_mouseover','onmouseover handler'],
-  ['RightClick','right-click disabled'],
-  ['popUpWidnow','popup window script'],
-  ['Iframe','hidden iframe'],
-];
-
-let ledger = [];
+let lastFeatures = null;
 
 async function runScan(){
   const url = document.getElementById('urlInput').value.trim();
   if(!url) return;
 
   const btn = document.getElementById('scanBtn');
-  const traceWrap = document.getElementById('traceWrap');
-  const traceList = document.getElementById('traceList');
-  const verdict = document.getElementById('verdict');
+  const revealZone = document.getElementById('revealZone');
+  const layerList = document.getElementById('layerList');
+  const verdictCard = document.getElementById('verdictCard');
+  const detailToggle = document.getElementById('detailToggle');
+  const featureDetail = document.getElementById('featureDetail');
 
   btn.disabled = true;
-  verdict.classList.remove('show');
-  traceWrap.classList.add('show');
-  traceList.innerHTML = '';
+  verdictCard.classList.remove('show');
+  detailToggle.style.display = 'none';
+  featureDetail.classList.remove('show');
+  revealZone.classList.add('show');
+  layerList.innerHTML = '';
 
-  // animate the trace readout
-  for(let i=0;i<SIGNAL_LABELS.length;i++){
-    await new Promise(r=>setTimeout(r, 45));
-    const [key,label] = SIGNAL_LABELS[i];
+  const layers = [
+    {icon:'①', title:'Structural analysis', sub:'domain, length, encoding tricks'},
+    {icon:'②', title:'Page inspection', sub:'SSL, forms, scripts, anchors'},
+    {icon:'③', title:'Model classification', sub:'weighing all 30 signals'},
+  ];
+
+  for(let i=0;i<layers.length;i++){
+    await new Promise(r=>setTimeout(r, 280));
     const row = document.createElement('div');
-    row.className = 'trace-row';
-    row.style.animationDelay = '0s';
-    const valClass = Math.random() > 0.8 ? 'neg' : (Math.random() > 0.5 ? 'pos' : 'neu');
-    const valText = valClass === 'neg' ? 'flagged' : (valClass === 'pos' ? 'clear' : 'checked');
-    row.innerHTML = `<span class="sig">${label}</span><span class="val ${valClass}">${valText}</span>`;
-    traceList.appendChild(row);
-    traceList.scrollTop = traceList.scrollHeight;
+    row.className = 'layer-row';
+    row.innerHTML = `
+      <div class="layer-icon">${layers[i].icon}</div>
+      <div class="layer-text">
+        <div class="layer-title">${layers[i].title}</div>
+        <div class="layer-sub">${layers[i].sub}</div>
+      </div>
+      <div class="layer-status">scanning…</div>`;
+    layerList.appendChild(row);
   }
 
   try{
@@ -436,68 +386,58 @@ async function runScan(){
     });
     const data = await res.json();
     const isThreat = data.prediction === 'MALICIOUS';
+    lastFeatures = data.features || null;
 
-    verdict.className = 'verdict show ' + (isThreat ? 'threat' : 'safe');
+    // mark all layers done
+    document.querySelectorAll('.layer-row').forEach(r=>{
+      r.classList.add('done');
+      r.querySelector('.layer-status').textContent = 'complete';
+    });
+
+    verdictCard.className = 'verdict-card show ' + (isThreat ? 'threat' : 'safe');
     document.getElementById('verdictIcon').textContent = isThreat ? '!' : '✓';
-    document.getElementById('verdictLabel').textContent = isThreat ? 'Malicious' : 'Safe';
-    document.getElementById('verdictSub').textContent = url;
+    document.getElementById('verdictLabel').textContent = isThreat ? 'This link is malicious' : 'This link is safe';
+    document.getElementById('verdictUrl').textContent = url;
 
-    ledger.unshift({url, threat:isThreat});
-    renderLedger();
+    if(lastFeatures){
+      detailToggle.style.display = 'flex';
+      featureDetail.innerHTML = Object.entries(lastFeatures).map(([k,v])=>{
+        const cls = v===1 ? 'pos' : (v===-1 ? 'neg' : 'neu');
+        return `<div class="frow"><span class="fname">${k}</span><span class="fval ${cls}">${v}</span></div>`;
+      }).join('');
+    }
   }catch(err){
-    verdict.className = 'verdict show threat';
+    verdictCard.className = 'verdict-card show threat';
     document.getElementById('verdictIcon').textContent = '!';
     document.getElementById('verdictLabel').textContent = 'Scan failed';
-    document.getElementById('verdictSub').textContent = err.message;
+    document.getElementById('verdictUrl').textContent = err.message;
   }
 
   btn.disabled = false;
 }
 
-function renderLedger(){
-  const body = document.getElementById('ledgerBody');
-  document.getElementById('ledgerCount').textContent = ledger.length;
-  if(ledger.length === 0){
-    body.innerHTML = '<div class="ledger-empty">No scans yet this session.</div>';
-    return;
-  }
-  body.innerHTML = ledger.slice(0,8).map(item => `
-    <div class="ledger-item ${item.threat ? 'threat' : 'safe'}">
-      <span class="dot"></span>
-      <span class="url">${item.url}</span>
-    </div>
-  `).join('');
+function toggleDetail(){
+  const detail = document.getElementById('featureDetail');
+  const arrow = document.getElementById('detailArrow');
+  detail.classList.toggle('show');
+  arrow.textContent = detail.classList.contains('show') ? '▾' : '▸';
 }
 
-document.getElementById('urlInput').addEventListener('keydown', e=>{
-  if(e.key === 'Enter') runScan();
-});
+document.getElementById('urlInput').addEventListener('keydown', e=>{ if(e.key==='Enter') runScan(); });
 
-// CSV mode
 const dz = document.getElementById('dropzone');
 const csvFile = document.getElementById('csvFile');
 const csvFname = document.getElementById('csvFname');
+csvFile.addEventListener('change', ()=>{ if(csvFile.files.length) csvFname.textContent = '✓ ' + csvFile.files[0].name; });
+['dragenter','dragover'].forEach(evt=> dz.addEventListener(evt, e=>{e.preventDefault(); dz.classList.add('drag');}));
+['dragleave','drop'].forEach(evt=> dz.addEventListener(evt, e=>{e.preventDefault(); dz.classList.remove('drag');}));
+dz.addEventListener('drop', e=>{ const f=e.dataTransfer.files; if(f.length){ csvFile.files=f; csvFname.textContent='✓ '+f[0].name; }});
 
-csvFile.addEventListener('change', ()=>{
-  if(csvFile.files.length) csvFname.textContent = '✓ ' + csvFile.files[0].name;
-});
-['dragenter','dragover'].forEach(evt=>{
-  dz.addEventListener(evt, e=>{e.preventDefault(); dz.classList.add('drag');});
-});
-['dragleave','drop'].forEach(evt=>{
-  dz.addEventListener(evt, e=>{e.preventDefault(); dz.classList.remove('drag');});
-});
-dz.addEventListener('drop', e=>{
-  const f = e.dataTransfer.files;
-  if(f.length){ csvFile.files = f; csvFname.textContent = '✓ ' + f[0].name; }
-});
-
-document.getElementById('csvForm').addEventListener('submit', async (e)=>{
+document.getElementById('csvForm').addEventListener('submit', async e=>{
   e.preventDefault();
   if(!csvFile.files.length) return;
   const btn = document.getElementById('csvBtn');
-  btn.disabled = true;
-  btn.textContent = 'Classifying…';
+  btn.disabled = true; btn.textContent = 'Classifying…';
 
   const formData = new FormData();
   formData.append('file', csvFile.files[0]);
@@ -505,38 +445,30 @@ document.getElementById('csvForm').addEventListener('submit', async (e)=>{
   try{
     const res = await fetch('/predict', {method:'POST', body: formData});
     const html = await res.text();
-
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
+    const doc = new DOMParser().parseFromString(html, 'text/html');
     const table = doc.querySelector('table');
-
     if(table){
       const headers = Array.from(table.querySelectorAll('thead th')).map(th=>th.textContent.trim());
-      let predIdx = headers.findIndex(h => h.toLowerCase().includes('predicted'));
+      let predIdx = headers.findIndex(h=>h.toLowerCase().includes('predicted'));
       const rows = Array.from(table.querySelectorAll('tbody tr'));
-
-      let threats = 0, safe = 0;
+      let threats=0, safe=0;
       rows.forEach(tr=>{
         const cells = tr.querySelectorAll('td');
-        if(predIdx===-1 || !cells[predIdx]) return;
+        if(predIdx===-1||!cells[predIdx]) return;
         const val = cells[predIdx].textContent.trim();
-        const isThreat = val === '-1' || val.toLowerCase()==='malicious';
-        if(isThreat){ threats++; cells[predIdx].innerHTML = '<span class="pill threat"><span class="d"></span>MALICIOUS</span>'; }
-        else{ safe++; cells[predIdx].innerHTML = '<span class="pill safe"><span class="d"></span>SAFE</span>'; }
+        const isThreat = val==='-1' || val.toLowerCase()==='malicious';
+        if(isThreat){ threats++; cells[predIdx].innerHTML='<span class="pill threat">malicious</span>'; }
+        else{ safe++; cells[predIdx].innerHTML='<span class="pill safe">safe</span>'; }
       });
-
       document.getElementById('rTotal').textContent = rows.length;
       document.getElementById('rThreat').textContent = threats;
       document.getElementById('rSafe').textContent = safe;
       document.getElementById('resultTable').innerHTML = table.innerHTML;
       document.getElementById('resultsPanel').classList.add('show');
     }
-  }catch(err){
-    alert('Upload failed: ' + err.message);
-  }
+  }catch(err){ alert('Upload failed: ' + err.message); }
 
-  btn.disabled = false;
-  btn.textContent = 'Run Bulk Classification';
+  btn.disabled = false; btn.textContent = 'Run bulk classification';
 });
 </script>
 </body>

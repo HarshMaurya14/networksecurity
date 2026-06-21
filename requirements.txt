@@ -11,6 +11,6 @@ mlflow
 dagshub
 fastapi
 uvicorn
-
+beautifulsoup4
 
 ##-e .

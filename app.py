@@ -95,7 +95,14 @@ async def predict_url_route(request: Request, url: str = Form(...)):
         y_pred = network_model.predict(input_df)
         result = "SAFE" if y_pred[0] == 1 else "MALICIOUS"
 
-        return {"url": url, "prediction": result}
+        return {
+            "url": url,
+            "prediction": result,
+            "features": features,   # ADDED: real computed signal values
+        }
+
+    except Exception as e:
+        raise NetworkSecurityException(e, sys)
 
     except Exception as e:
         raise NetworkSecurityException(e, sys)
