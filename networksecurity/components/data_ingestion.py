@@ -57,9 +57,11 @@ class DataIngestion:
 
     def split_data_as_train_test(self, dataframe):
         train_set, test_set = train_test_split(
-            dataframe,
-            test_size=self.data_ingestion_config.train_test_split_ratio
+        dataframe,
+        test_size=self.data_ingestion_config.train_test_split_ratio,
+        random_state=42
         )
+        
 
         train_dir_path = os.path.dirname(
             self.data_ingestion_config.training_file_path
