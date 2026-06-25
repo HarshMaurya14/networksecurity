@@ -95,7 +95,7 @@
 ║                       ETL PIPELINE                                  ║
 ║                                                                     ║
 ║   CSV Rows  ──►  JSON Transform  ──►  MongoDB Atlas                 ║
-║   {A:100, B:120, C:140}              (KrishAI.NetworkData)          ║
+║   {A:100, B:120, C:140}                    
 ╚══════════════════════════════╦═══════════════════════════════════════╝
                                ║
                                ▼
