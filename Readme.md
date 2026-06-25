@@ -3,7 +3,6 @@
 
 <div align="center">
 
-<!-- Badges -->
 <p>
   <img src="https://img.shields.io/badge/Python-3.10-3776AB?style=for-the-badge&logo=python&logoColor=white"/>
   <img src="https://img.shields.io/badge/FastAPI-Latest-009688?style=for-the-badge&logo=fastapi&logoColor=white"/>
@@ -26,7 +25,7 @@
 
 <br/>
 
-[🚀 Quick Start](#-quick-start) · [🏗️ Architecture](#%EF%B8%8F-architecture) · [🔬 Feature Engine](#-live-feature-extraction) · [🌐 API](#-api-reference) · [🤖 ML Models](#-ml-models) · [☁️ Deploy](#%EF%B8%8F-deployment)
+[🚀 Quick Start](#-quick-start) · [🏗️ Architecture](#%EF%B8%8F-system-architecture) · [🔬 Feature Engine](#-live-feature-extraction) · [🌐 API](#-api-reference) · [🤖 ML Models](#-ml-models) · [☁️ Deploy](#%EF%B8%8F-deployment)
 
 </div>
 
@@ -36,13 +35,15 @@
 
 - [What's New](#-whats-new-in-this-version)
 - [Overview](#-overview)
-- [Architecture](#%EF%B8%8F-architecture)
+- [System Architecture](#%EF%B8%8F-system-architecture)
+- [ETL Pipeline](#-etl-pipeline)
+- [Training Pipeline — Deep Dive](#-training-pipeline--deep-dive)
 - [Live Feature Extraction](#-live-feature-extraction)
 - [ML Models](#-ml-models)
 - [Project Structure](#-project-structure)
 - [API Reference](#-api-reference)
 - [Dataset](#-dataset)
-- [Getting Started](#-quick-start)
+- [Quick Start](#-quick-start)
 - [Deployment](#%EF%B8%8F-deployment)
 - [Tech Stack](#%EF%B8%8F-tech-stack)
 - [Skills Demonstrated](#-skills-demonstrated)
@@ -72,125 +73,265 @@
 |---|---|
 | 🏗️ **MLOps Pipeline** | Automated ingestion → validation → transformation → training |
 | 🔬 **Feature Engineering** | Live 3-tier URL feature extraction engine |
-| 🤖 **ML Training** | 5 classifiers with hyperparameter grid search |
-| 🌐 **REST API** | FastAPI with 4 endpoints + custom HTML frontend |
-| 📊 **Experiment Tracking** | MLflow + DagsHub — F1, Precision, Recall |
+| 🤖 **ML Training** | 5 classifiers with hyperparameter grid search + auto model selection |
+| 🌐 **REST API** | FastAPI with 4 prediction endpoints + custom HTML frontend |
+| 📊 **Experiment Tracking** | MLflow + DagsHub — F1, Precision, Recall per run |
 | ☁️ **Cloud Deployment** | Docker → AWS ECR → EC2 via GitHub Actions CI/CD |
 
 ---
 
-## 🏛️ Architecture
+## 🏛️ System Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                        USER INTERFACES                           │
-│          Browser UI  │   REST API   │   CSV Upload               │
-└──────────────────────────────┬───────────────────────────────────┘
-                               │
+╔══════════════════════════════════════════════════════════════════════╗
+║                         DATA SOURCES                                ║
+║   📂 Local CSV Dataset        🌐 APIs / S3 / Internal DBs           ║
+╚══════════════════════════════╦═══════════════════════════════════════╝
+                               ║
                                ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                      FastAPI Application                         │
-│                                                                  │
-│   GET  /          → Custom HTML Dashboard                        │
-│   GET  /train     → Trigger Training Pipeline                    │
-│   POST /predict          → Batch (pre-built feature CSV)         │
-│   POST /predict_url      → Single raw URL  ⭐ NEW                │
-│   POST /predict_url_csv  → Bulk raw URLs   ⭐ NEW                │
-└───────────┬──────────────────────────────────────┬───────────────┘
-            │                                      │
-            ▼                                      ▼
-┌───────────────────────┐            ┌─────────────────────────────┐
-│   URL Feature         │            │      Training Pipeline       │
-│   Extractor           │            │                              │
-│                       │            │  [1] Data Ingestion          │
-│   Tier 1 · URL parse  │            │       MongoDB → CSV split    │
-│   Tier 2 · HTML fetch │            │                              │
-│   Tier 3 · defaults   │            │  [2] Data Validation         │
-│                       │            │       Schema + drift report  │
-│   24/30 live features │            │                              │
-└───────────┬───────────┘            │  [3] Data Transformation     │
-            │                        │       KNN Imputer + .npy     │
-            ▼                        │                              │
-┌───────────────────────┐            │  [4] Model Trainer           │
-│     NetworkModel      │◄───────────│       5 classifiers + CV     │
-│   preprocessor.pkl    │            │       Best model saved       │
-│   +  model.pkl        │            └─────────────────────────────┘
-└───────────┬───────────┘
-            │                        ┌─────────────────────────────┐
-            ▼                        │   MLflow + DagsHub          │
-  ✅ SAFE / 🔴 MALICIOUS             │   F1 · Precision · Recall   │
-  + full feature breakdown           └─────────────────────────────┘
+╔══════════════════════════════════════════════════════════════════════╗
+║                       ETL PIPELINE                                  ║
+║                                                                     ║
+║   CSV Rows  ──►  JSON Transform  ──►  MongoDB Atlas                 ║
+║   {A:100, B:120, C:140}              (KrishAI.NetworkData)          ║
+╚══════════════════════════════╦═══════════════════════════════════════╝
+                               ║
+                               ▼
+╔══════════════════════════════════════════════════════════════════════╗
+║                    TRAINING PIPELINE                                ║
+║                                                                     ║
+║  ┌─────────────────┐   ┌─────────────────┐   ┌──────────────────┐  ║
+║  │ Data Ingestion  │──►│ Data Validation │──►│ Data Transform.  │  ║
+║  │                 │   │                 │   │                  │  ║
+║  │ MongoDB → CSV   │   │ Schema check    │   │ KNN Imputer      │  ║
+║  │ 80/20 split     │   │ Drift report    │   │ SMOTETomek       │  ║
+║  │ Drop columns    │   │ Col validation  │   │ → train/test.npy │  ║
+║  └─────────────────┘   └─────────────────┘   └──────────────────┘  ║
+║                                                        ║            ║
+║                                                        ▼            ║
+║  ┌─────────────────┐   ┌─────────────────┐   ┌──────────────────┐  ║
+║  │  Model Pusher   │◄──│ Model Evaluator │◄──│  Model Trainer   │  ║
+║  │                 │   │                 │   │                  │  ║
+║  │ Model Accepted? │   │ vs base score   │   │ 5 classifiers    │  ║
+║  │ Yes → Cloud     │   │ F1/Prec/Recall  │   │ Grid search CV   │  ║
+║  │ No  → None      │   │ metric artifact │   │ Best model saved │  ║
+║  └─────────────────┘   └─────────────────┘   └──────────────────┘  ║
+╚══════════════════════════════╦═══════════════════════════════════════╝
+                               ║
+                               ▼
+╔══════════════════════════════════════════════════════════════════════╗
+║                      FastAPI APPLICATION                            ║
+║                                                                     ║
+║   GET  /               → Custom HTML Dashboard                      ║
+║   GET  /train          → Trigger Training Pipeline                  ║
+║   POST /predict        → Batch (pre-built 30-feature CSV)           ║
+║   POST /predict_url    → Single raw URL  ⭐ NEW                     ║
+║   POST /predict_url_csv → Bulk raw URLs  ⭐ NEW                     ║
+╚══════════════════════════════╦═══════════════════════════════════════╝
+                               ║
+               ┌───────────────╩────────────────┐
+               ▼                                ▼
+╔══════════════════════╗            ╔═══════════════════════╗
+║   URL Feature        ║            ║  NetworkModel         ║
+║   Extractor          ║            ║                       ║
+║                      ║            ║  preprocessor.pkl     ║
+║  Tier 1: URL parse   ║──────────►║  +  model.pkl         ║
+║  Tier 2: HTML fetch  ║            ║                       ║
+║  Tier 3: defaults    ║            ║  → SAFE / MALICIOUS   ║
+╚══════════════════════╝            ╚═══════════════════════╝
+```
+
+---
+
+## 🔄 ETL Pipeline
+
+The raw CSV dataset is transformed to JSON and pushed to MongoDB Atlas before training begins.
+
+```
+  EXTRACT                  TRANSFORM                   LOAD
+┌──────────────┐          ┌─────────────────┐        ┌──────────────────┐
+│   Source     │          │  Basic Preproc  │        │  Destination     │
+│              │          │                 │        │                  │
+│  Local CSV   │ ───────► │  Cleaning raw   │ ─────► │  MongoDB Atlas   │
+│  Dataset     │          │  data           │        │  AWS DynamoDB    │
+│              │          │                 │        │  MySQL           │
+│  APIs        │          │  CSV row:       │        │  S3 Buckets      │
+│  S3 Buckets  │          │  {A:100,        │        │                  │
+│  Paid APIs   │          │   B:120,        │        └──────────────────┘
+│  Internal DB │          │   C:140}        │
+└──────────────┘          │       ↓         │
+                          │    JSON array   │
+                          │  pushed to DB   │
+                          └─────────────────┘
+```
+
+---
+
+## 🔬 Training Pipeline — Deep Dive
+
+### Step 1 — Data Ingestion
+
+```
+MongoDB Atlas (KrishAI.NetworkData)
+         │
+         ▼  ① Fetch collection
+┌────────────────────┐
+│ Data Ingestion     │◄── Config: dir paths, collection name,
+│ Component          │            train/test split ratio
+└────────┬───────────┘
+         │  ② Export to Feature Store  →  raw.csv (timestamped)
+         │  ③ Drop unwanted columns
+         │  ④ Split 80/20             →  train.csv + test.csv
+         ▼
+   Data Ingestion Artifact
+   (paths to train.csv, test.csv)
+```
+
+### Step 2 — Data Validation
+
+```
+      train.csv + test.csv
+              │
+              ▼
+┌──────────────────────────────┐
+│  Data Validation Component   │◄── Schema: 30 features, int64
+│                              │
+│  ① Same schema?              │──── ✅ Same no. of features
+│  ② Numerical columns exist?  │──── ✅ Datatype validated
+│  ③ Data drift detected?      │──── 📊 Drift report generated
+└──────────────┬───────────────┘
+               │
+       ┌───────┴────────┐
+       ▼                ▼
+  valid_train.csv   Drift Report
+  valid_test.csv    (YAML artifact)
+```
+
+### Step 3 — Data Transformation
+
+```
+  valid_train.csv + valid_test.csv
+              │
+              ▼
+┌──────────────────────────────────┐
+│  Data Transformation Component   │
+│                                  │
+│  ① Drop target column            │
+│  ② KNN Imputer (k=3, uniform)   │◄── handles missing values
+│  ③ SMOTETomek                    │◄── balances class distribution
+│  ④ fit_transform on train        │
+│     transform on test            │
+│  ⑤ Save preprocessor.pkl        │
+└──────────────┬───────────────────┘
+               │
+       ┌───────┴────────┐
+       ▼                ▼
+   train.npy        test.npy
+   (numpy arrays, ready for training)
+```
+
+### Step 4 — Model Trainer
+
+```
+  train.npy + test.npy + preprocessor.pkl
+              │
+              ▼
+┌──────────────────────────────────┐
+│  Model Trainer Component         │
+│                                  │
+│  Model Factory → get_best_model  │
+│                                  │
+│  ┌───────────────────────────┐   │
+│  │  5 Classifiers compete:   │   │
+│  │  • Random Forest          │   │
+│  │  • Decision Tree          │   │
+│  │  • Gradient Boosting      │   │
+│  │  • Logistic Regression    │   │
+│  │  • AdaBoost               │   │
+│  └───────────────────────────┘   │
+│                                  │
+│  best_score ≥ expected_accuracy? │
+│  ✅ Yes → Save NetworkModel      │
+│  ❌ No  → Raise exception        │
+└──────────────┬───────────────────┘
+               │
+       ┌───────┴────────┐
+       ▼                ▼
+   model.pkl       metric_artifact
+   (NetworkModel)  (F1, Precision, Recall)
+                   → logged to MLflow + DagsHub
+```
+
+### Step 5 — Model Evaluation & Pusher
+
+```
+  model.pkl + metric_artifact
+              │
+              ▼
+┌──────────────────────────────────┐
+│  Model Evaluator                 │
+│                                  │
+│  New model score vs base score?  │
+│                                  │
+│  ✅ Accepted → Model Pusher      │──► Cloud (AWS S3 / Azure)
+│  ❌ Rejected → None              │
+└──────────────────────────────────┘
 ```
 
 ---
 
 ## 🔬 Live Feature Extraction
 
-The biggest upgrade over v1 — you no longer need to pre-compute features. The engine handles it live in 3 tiers:
-
 ```
-Raw URL Input  →  "https://paypal-login.free.xyz/secure/verify"
+Raw URL Input → "https://paypal-login.free.xyz/secure/verify"
       │
+      ├── TIER 1 · Pure string parsing · ~0ms · 16 features
+      │   ┌──────────────────────────────────────────────────┐
+      │   │  having_IP_Address       URL_Length              │
+      │   │  Shortining_Service      having_At_Symbol        │
+      │   │  double_slash_redirect   Prefix_Suffix           │
+      │   │  having_Sub_Domain       HTTPS_token  · port ... │
+      │   └──────────────────────────────────────────────────┘
       │
-      ├──── TIER 1  ·  Pure String Parsing  ·  ~0ms  ·  16 features
-      │     ┌─────────────────────────────────────────────────────┐
-      │     │  having_IP_Address       URL_Length                 │
-      │     │  Shortining_Service      having_At_Symbol           │
-      │     │  double_slash_redirect   Prefix_Suffix              │
-      │     │  having_Sub_Domain       HTTPS_token                │
-      │     │  port  ...                                          │
-      │     └─────────────────────────────────────────────────────┘
+      ├── TIER 2 · Live HTML page fetch · ~1s · 8 features
+      │   ┌──────────────────────────────────────────────────┐
+      │   │  SSLfinal_State   Favicon      Request_URL       │
+      │   │  URL_of_Anchor    Links_in_tags   SFH            │
+      │   │  on_mouseover     RightClick   popUpWidnow       │
+      │   │  Iframe           Redirect                       │
+      │   └──────────────────────────────────────────────────┘
       │
-      ├──── TIER 2  ·  Live HTML Page Fetch  ·  ~1s  ·  8 features
-      │     ┌─────────────────────────────────────────────────────┐
-      │     │  SSLfinal_State   Favicon       Request_URL         │
-      │     │  URL_of_Anchor    Links_in_tags SFH                 │
-      │     │  on_mouseover     RightClick    popUpWidnow         │
-      │     │  Iframe           Redirect                          │
-      │     └─────────────────────────────────────────────────────┘
-      │
-      └──── TIER 3  ·  Honest Neutral Defaults  ·  6 features
-            ┌─────────────────────────────────────────────────────┐
-            │  Domain_registeration_length → 0  (WHOIS, no API)  │
-            │  age_of_domain               → 0  (WHOIS, no API)  │
-            │  web_traffic                 → 0  (Alexa shutdown)  │
-            │  Page_Rank                   → 0  (Google shutdown) │
-            │  Links_pointing_to_page      → 0  (paid SEO APIs)  │
-            │  Statistical_report          → 1  (clean by default)│
-            └─────────────────────────────────────────────────────┘
-                               │
-                               ▼
-            30-feature vector → preprocessor → model
-                               │
-                     ✅ SAFE  or  🔴 MALICIOUS
+      └── TIER 3 · Honest neutral defaults · 6 features
+          ┌──────────────────────────────────────────────────┐
+          │  Domain_registeration_length → 0 (no WHOIS API) │
+          │  age_of_domain               → 0 (no WHOIS API) │
+          │  web_traffic                 → 0 (Alexa down)   │
+          │  Page_Rank                   → 0 (Google down)  │
+          │  Links_pointing_to_page      → 0 (paid APIs)    │
+          │  Statistical_report          → 1 (default safe) │
+          └──────────────────────────────────────────────────┘
+                             │
+                             ▼
+          30-feature vector → preprocessor → model
+                             │
+                   ✅ SAFE  or  🔴 MALICIOUS
 ```
 
-> **24 of 30 features are genuinely computed live.** The remaining 6 use honest neutral defaults — documented transparently, never silently faked.
+> **24 of 30 features computed live.** The remaining 6 use honest neutral defaults — never silently faked.
 
 ---
 
 ## 🤖 ML Models
-
-5 classifiers compete with hyperparameter grid search. The best F1 scorer is saved automatically.
 
 | Model | Hyperparameters Tuned |
 |---|---|
 | 🌲 **Random Forest** | `n_estimators`: 8 · 16 · 32 · 128 · 256 |
 | 🌳 **Decision Tree** | `criterion`: gini · entropy · log_loss |
 | 🚀 **Gradient Boosting** | `learning_rate`, `subsample`, `n_estimators` |
-| 📈 **Logistic Regression** | Strong baseline — no tuning needed |
+| 📈 **Logistic Regression** | Strong baseline |
 | ⚡ **AdaBoost** | `learning_rate`, `n_estimators` |
 
-**Preprocessing:** KNN Imputer (k=3, uniform weights) handles missing values before any model sees the data.
-
-**MLflow tracks every run:**
-
-```
-Run: gradient_boosting_20240625
-├── f1_score:        0.974
-├── precision:       0.981
-└── recall_score:    0.968
-```
+MLflow tracks every run: `f1_score` · `precision` · `recall_score`
 
 ---
 
@@ -199,31 +340,26 @@ Run: gradient_boosting_20240625
 ```
 MLops/
 │
-├── 📄 app.py                              # FastAPI — all 4 prediction endpoints
+├── 📄 app.py                              # FastAPI — all 4 endpoints
 ├── 📄 main.py                             # Run training pipeline standalone
 ├── 📄 push_data.py                        # Push CSV → MongoDB Atlas
 │
 ├── 📂 networksecurity/
 │   ├── 📂 components/
-│   │   ├── data_ingestion.py              # MongoDB → train/test CSV split
+│   │   ├── data_ingestion.py              # MongoDB → train/test split
 │   │   ├── data_validation.py             # Schema check + drift report
-│   │   ├── data_transformation.py         # KNN impute + .npy save
+│   │   ├── data_transformation.py         # KNN impute + SMOTETomek + .npy
 │   │   └── model_trainer.py               # Train 5 models, pick best, log MLflow
 │   │
 │   ├── 📂 pipeline/
-│   │   └── training_pipeline.py           # Orchestrates all 4 components
+│   │   └── training_pipeline.py           # Orchestrates all components
 │   │
 │   ├── 📂 utlis/
 │   │   ├── main_utlis/utlis.py            # save/load objects, evaluate_models
-│   │   ├── ml_utlis/
-│   │   │   ├── model/estimator.py         # NetworkModel wrapper class
-│   │   │   └── metric/classification_metric.py
+│   │   ├── ml_utlis/model/estimator.py    # NetworkModel wrapper
 │   │   └── url_feature_extraction.py      # ⭐ Live 3-tier feature extractor
 │   │
-│   ├── 📂 entity/
-│   │   ├── config_entity.py               # Pipeline config dataclasses
-│   │   └── artifact_entity.py             # Artifact path dataclasses
-│   │
+│   ├── 📂 entity/                         # Config & artifact dataclasses
 │   ├── 📂 constant/training_pipeline/     # All pipeline constants
 │   ├── 📂 cloud/s3_syncer.py              # AWS S3 model sync
 │   ├── 📂 exception/exception.py          # Custom exception handler
@@ -237,12 +373,9 @@ MLops/
 │   ├── model.pkl                          # Best trained classifier
 │   └── preprocessor.pkl                   # Fitted KNN imputer
 │
-├── 📂 data_schema/schema.yaml             # Column types & feature order
-├── 📂 network_data/phisingData.csv        # Raw training dataset (~11k URLs)
-├── 📂 prediction_output/                  # Saved CSVs from prediction runs
-│   ├── output.csv                         # /predict results
-│   └── url_batch_output.csv              # /predict_url_csv results
-│
+├── 📂 data_schema/schema.yaml
+├── 📂 network_data/phisingData.csv
+├── 📂 prediction_output/
 ├── 📄 Dockerfile
 ├── 📄 requirements.txt
 └── 📄 setup.py
@@ -252,34 +385,22 @@ MLops/
 
 ## 🌐 API Reference
 
-### `GET /`
-Serves the full custom frontend dashboard.
-
----
-
 ### `GET /train`
-Triggers the complete training pipeline — ingest → validate → transform → train → save model.
+Triggers the full pipeline: ingest → validate → transform → train → save.
 
 ```bash
 curl http://localhost:8000/train
-# → "Training is successful"
 ```
-
----
 
 ### `POST /predict`
-Batch prediction from a **pre-built feature CSV** (30 columns matching schema). No feature extraction — fast.
+Batch prediction from a **pre-built 30-feature CSV**. Fast — no extraction.
 
 ```bash
-curl -X POST http://localhost:8000/predict \
-  -F "file=@valid_data/test.csv"
-# → HTML table with predicted_column appended
+curl -X POST http://localhost:8000/predict -F "file=@valid_data/test.csv"
 ```
 
----
-
 ### `POST /predict_url` ⭐ New
-Classify a **single raw URL** with live feature extraction.
+Single raw URL classified with live feature extraction.
 
 ```bash
 curl -X POST http://localhost:8000/predict_url \
@@ -290,29 +411,16 @@ curl -X POST http://localhost:8000/predict_url \
 {
   "url": "https://suspicious-login.xyz/paypal",
   "prediction": "MALICIOUS",
-  "features": {
-    "having_IP_Address": 1,
-    "URL_Length": -1,
-    "Prefix_Suffix": -1,
-    "SSLfinal_State": -1,
-    "Favicon": -1,
-    "..."
-  }
+  "features": { "having_IP_Address": 1, "URL_Length": -1, "..." }
 }
 ```
 
----
-
 ### `POST /predict_url_csv` ⭐ New
-Bulk-classify a **CSV of raw URLs** (one column: `url`). Runs live extraction on every row.
+CSV of raw URLs (column: `url`) — live extraction on every row.
 
 ```bash
-curl -X POST http://localhost:8000/predict_url_csv \
-  -F "file=@my_urls.csv"
-# → HTML table · saved to prediction_output/url_batch_output.csv
+curl -X POST http://localhost:8000/predict_url_csv -F "file=@my_urls.csv"
 ```
-
-> ⚠️ Slower than `/predict` because each row triggers a real HTTP page fetch. That's the honest tradeoff for not needing pre-built features.
 
 ---
 
@@ -323,101 +431,83 @@ curl -X POST http://localhost:8000/predict_url_csv \
 | **Source** | UCI Phishing Websites Dataset |
 | **Storage** | MongoDB Atlas — `KrishAI.NetworkData` |
 | **Size** | ~11,000 URLs |
-| **Features** | 30 numerical (all `int64`) |
+| **Features** | 30 numerical (`int64`) |
 | **Target** | `Result`: **1** = Legitimate · **-1** = Phishing |
-| **Train / Test Split** | 80% / 20% |
-
-**Feature encoding convention:**
-
-| Value | Meaning |
-|---|---|
-| `1` | Legitimate / safe signal |
-| `0` | Neutral / unknown |
-| `-1` | Phishing / suspicious signal |
+| **Split** | 80% train / 20% test |
 
 ---
 
 ## 🚀 Quick Start
 
-### Prerequisites
-
-- Python 3.10+
-- MongoDB Atlas account
-- AWS account (for cloud deployment)
-- Docker (optional)
-
-### 1. Clone & Install
-
 ```bash
+# 1. Clone & install
 git clone https://github.com/HarshMaurya14/networksecurity.git
 cd networksecurity
-pip install -r requirements.txt
-pip install -e .
-```
+pip install -r requirements.txt && pip install -e .
 
-### 2. Configure Environment
+# 2. Set environment variable
+export MONGODB_URL_KEY="mongodb+srv://<user>:<pass>@cluster.mongodb.net/"
 
-```env
-# .env
-MONGODB_URL_KEY=mongodb+srv://<user>:<pass>@cluster.mongodb.net/
-```
-
-### 3. Push Data to MongoDB
-
-```bash
+# 3. Push data to MongoDB
 python push_data.py
-```
 
-### 4. Run the Training Pipeline
-
-```bash
-# Option A — standalone script
+# 4. Train
 python main.py
 
-# Option B — via API after server starts
-curl http://localhost:8000/train
-```
-
-### 5. Launch the Server
-
-```bash
-python app.py
-# → http://localhost:8000
+# 5. Serve
+python app.py   # → http://localhost:8000
 ```
 
 ---
 
 ## ☁️ Deployment
 
-### Docker
-
-```bash
-docker build -t netguard .
-
-docker run -d -p 8000:8000 \
-  -e MONGODB_URL_KEY=your_connection_string \
-  netguard
-```
-
-### GitHub Actions CI/CD Pipeline
+### CI/CD Flow — GitHub Actions
 
 ```
-git push → main
+git push → main branch
       │
       ▼
-┌─────────────────────────────┐
-│  [1] Continuous Integration │  ← Lint & unit test checks
-└─────────────┬───────────────┘
-              │
-              ▼
-┌─────────────────────────────┐
-│  [2] Continuous Delivery    │  ← Build Docker image → push to AWS ECR
-└─────────────┬───────────────┘
-              │
-              ▼
-┌─────────────────────────────┐
-│  [3] Continuous Deployment  │  ← Pull & run on EC2 (self-hosted runner)
-└─────────────────────────────┘
+╔══════════════════════════════════════════════════════════╗
+║  STEP 1 — Continuous Integration                        ║
+║  • Lint checks                                          ║
+║  • Unit tests                                           ║
+╚══════════════════════════╦═══════════════════════════════╝
+                           ║
+                           ▼
+╔══════════════════════════════════════════════════════════╗
+║  STEP 2 — Continuous Delivery                           ║
+║  • Configure AWS credentials                            ║
+║  • Login to Amazon ECR                                  ║
+║  • docker build -t netguard .                           ║
+║  • docker push → AWS ECR Registry                       ║
+╚══════════════════════════╦═══════════════════════════════╝
+                           ║
+                           ▼
+╔══════════════════════════════════════════════════════════╗
+║  STEP 3 — Continuous Deployment  (self-hosted EC2)      ║
+║  • docker pull latest image from ECR                    ║
+║  • docker run -d -p 8080:8000 netguard                  ║
+║  • docker system prune (clean old images)               ║
+╚══════════════════════════════════════════════════════════╝
+                           ║
+                           ▼
+                    🌐 Live on EC2
+               http://<ec2-ip>:8080
+```
+
+### Deployment Flow (from your notes)
+
+```
+┌──────────────────┐        ┌───────────────┐        ┌────────────┐
+│ Network Security │ ──①──► │   AWS ECR     │ ──────► │  AWS EC2   │
+│   (Source Code)  │        │ Docker Image  │        │  Running   │
+└──────────────────┘        └───────────────┘        └────────────┘
+                                    ▲
+                             ②  GitHub Actions
+                             CI → CD Pipeline
+                                    │
+                               App Runner
 ```
 
 ### Required GitHub Secrets
@@ -428,9 +518,9 @@ git push → main
 | `AWS_SECRET_ACCESS_KEY` | AWS secret key |
 | `AWS_REGION` | e.g. `us-east-1` |
 | `AWS_ECR_LOGIN_URI` | Your ECR registry URI |
-| `ECR_REPOSITORY_NAME` | Your ECR repository name |
+| `ECR_REPOSITORY_NAME` | Your ECR repo name |
 
-### EC2 Docker Setup (run once on fresh instance)
+### EC2 Docker Setup
 
 ```bash
 sudo apt-get update -y && sudo apt-get upgrade -y
@@ -439,7 +529,12 @@ sudo sh get-docker.sh
 sudo usermod -aG docker ubuntu && newgrp docker
 ```
 
-**S3 bucket for model artifacts:** `netguard-harsh-mlops`
+### Docker
+
+```bash
+docker build -t netguard .
+docker run -d -p 8000:8000 -e MONGODB_URL_KEY=your_url netguard
+```
 
 ---
 
@@ -450,7 +545,8 @@ sudo usermod -aG docker ubuntu && newgrp docker
 | Layer | Technology |
 |---|---|
 | **Language** | Python 3.10 |
-| **ML Framework** | scikit-learn — 5 classifiers + GridSearchCV |
+| **ML** | scikit-learn — 5 classifiers + GridSearchCV |
+| **Imbalance Handling** | SMOTETomek (imblearn) |
 | **API** | FastAPI + Uvicorn |
 | **Frontend** | Jinja2 HTML templates |
 | **Database** | MongoDB Atlas (PyMongo) |
@@ -459,7 +555,7 @@ sudo usermod -aG docker ubuntu && newgrp docker
 | **Cloud** | AWS S3 · EC2 · ECR |
 | **Containerization** | Docker |
 | **CI/CD** | GitHub Actions |
-| **Serialization** | dill (.pkl model files) |
+| **Serialization** | dill (.pkl files) |
 
 </div>
 
@@ -468,18 +564,13 @@ sudo usermod -aG docker ubuntu && newgrp docker
 ## 🎓 Skills Demonstrated
 
 - ✅ **MLOps** — end-to-end automated ML pipeline design
+- ✅ **ETL Engineering** — CSV → JSON → MongoDB ingestion pipeline
 - ✅ **Feature Engineering** — live 3-tier URL feature extraction from raw HTML
-- ✅ **Model Selection** — multi-model training with grid search and auto-selection
+- ✅ **Model Selection** — multi-model grid search with automated best-model selection
+- ✅ **Class Imbalance** — SMOTETomek oversampling + undersampling
 - ✅ **API Development** — FastAPI with multiple prediction modes
 - ✅ **Experiment Tracking** — MLflow + DagsHub integration
 - ✅ **Cloud Deployment** — Docker → ECR → EC2 with full CI/CD
-- ✅ **Data Engineering** — MongoDB ingestion, validation, transformation pipeline
-
----
-
-## 📄 License
-
-This project is licensed under the **MIT License**.
 
 ---
 
